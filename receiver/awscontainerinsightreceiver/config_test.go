@@ -34,6 +34,7 @@ func TestLoadConfig(t *testing.T) {
 			id: component.NewIDWithName(metadata.Type, "collection_interval_settings"),
 			expected: &Config{
 				CollectionInterval:        60 * time.Second,
+				CollectionRole:            ALL,
 				ContainerOrchestrator:     "eks",
 				TagService:                true,
 				PrefFullPodName:           false,
@@ -45,6 +46,7 @@ func TestLoadConfig(t *testing.T) {
 			id: component.NewIDWithName(metadata.Type, "cluster_name"),
 			expected: &Config{
 				CollectionInterval:        60 * time.Second,
+				CollectionRole:            ALL,
 				ContainerOrchestrator:     "eks",
 				TagService:                true,
 				PrefFullPodName:           false,
@@ -57,6 +59,7 @@ func TestLoadConfig(t *testing.T) {
 			id: component.NewIDWithName(metadata.Type, "leader_lock_name"),
 			expected: &Config{
 				CollectionInterval:        60 * time.Second,
+				CollectionRole:            ALL,
 				ContainerOrchestrator:     "eks",
 				TagService:                true,
 				PrefFullPodName:           false,
@@ -68,6 +71,7 @@ func TestLoadConfig(t *testing.T) {
 			id: component.NewIDWithName(metadata.Type, "leader_lock_using_config_map_only"),
 			expected: &Config{
 				CollectionInterval:           60 * time.Second,
+				CollectionRole:               ALL,
 				ContainerOrchestrator:        "eks",
 				TagService:                   true,
 				PrefFullPodName:              false,
@@ -80,6 +84,7 @@ func TestLoadConfig(t *testing.T) {
 			id: component.NewIDWithName(metadata.Type, "enable_control_plane_metrics"),
 			expected: &Config{
 				CollectionInterval:        60 * time.Second,
+				CollectionRole:            ALL,
 				ContainerOrchestrator:     "eks",
 				TagService:                true,
 				PrefFullPodName:           false,
@@ -91,6 +96,7 @@ func TestLoadConfig(t *testing.T) {
 			id: component.NewIDWithName(metadata.Type, "custom_kube_config_path"),
 			expected: &Config{
 				CollectionInterval:    60 * time.Second,
+				CollectionRole:        ALL,
 				ContainerOrchestrator: "eks",
 				TagService:            true,
 				PrefFullPodName:       false,
