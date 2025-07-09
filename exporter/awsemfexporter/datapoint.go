@@ -213,37 +213,11 @@ func (dps histogramDataPointSlice) CalculateDeltaDatapoints(i int, _ string, _ b
 		count = summaryMetricDelta.count
 	}
 
-	values := make([]float64, 0)
-	counts := make([]float64, 0)
 	bounds := metric.ExplicitBounds()
 	bucketCounts := metric.BucketCounts()
 
-	// Handle the first bucket (min, bounds[0]]
-	if bucketCounts.Len() > 0 {
-		if bounds.Len() > 0 {
-			midpoint := (metric.Min() + bounds.At(0)) / 2
-			values = append(values, midpoint)
-			counts = append(counts, float64(bucketCounts.At(0)))
-		}
-	}
-
-	// Handle middle buckets (bounds[i-1], bounds[i]]
-	for i := 1; i < bounds.Len(); i++ {
-		if i < bucketCounts.Len() && bucketCounts.At(i) > 0 {
-			midpoint := (bounds.At(i-1) + bounds.At(i)) / 2
-			values = append(values, midpoint)
-			counts = append(counts, float64(bucketCounts.At(i)))
-		}
-	}
-
-	// Handle the last bucket (bounds[last], max)
-	if bounds.Len() < bucketCounts.Len() && bucketCounts.At(bucketCounts.Len()-1) > 0 {
-		if bounds.Len() > 0 {
-			midpoint := (bounds.At(bounds.Len()-1) + metric.Max()) / 2
-			values = append(values, midpoint)
-			counts = append(counts, float64(bucketCounts.At(bucketCounts.Len()-1)))
-		}
-	}
+	// Calculate values and counts using exponential histogram
+	values, counts := calculateHistogramValuesAndCounts(bounds, bucketCounts, metric.Min(), metric.Max())
 
 	return []dataPoint{{
 		name: dps.metricName,
@@ -463,6 +437,77 @@ func collectDatapointsWithNegativeBuckets(split *dataPointSplit, metric pmetric.
 	}
 
 	return currentBucketIndex, currentNegativeIndex
+}
+
+func calculateHistogramValuesAndCounts(bounds pcommon.Float64Slice, bucketCounts pcommon.UInt64Slice, min, max float64) ([]float64, []float64) {
+	var values, counts []float64
+	for i := 0; i < bucketCounts.Len(); i++ {
+		currentBucket := bounds.At(i)
+		sampleCount := float64(bucketCounts.At(i))
+
+		if bucketCounts.At(i) == 0 {
+			continue
+		}
+
+		prevBucket := min // If we are the first bucket, we take min
+		if i > 0 {
+			prevBucket = bounds.At(i-1)
+		}
+
+		nextBucket := max  // If we are the last bucket, take max
+		if i < bounds.Len()-1 {
+			nextBucket = bounds.At(i+1)
+		}
+
+		
+		magnitude := -1.0 
+		if i < bucketCounts.Len()-1{
+			nextSampleCount := float64(bucketCounts.At(i+1))
+			magnitude = math.Log((currentBucket-prevBucket)/sampleCount / 
+				((nextBucket-currentBucket)/nextSampleCount))
+		}
+		var epsilon float64
+		innerBucketCount := int(math.Min(float64(sampleCount), 50))
+		delta := (currentBucket - prevBucket) / float64(innerBucketCount)
+
+		// Apply different distribution based on magnitude
+		if magnitude < 0 {
+			sigma := 0.0
+			for j := 1; j <= innerBucketCount; j++ {
+				sigma += math.Pow(float64(j), 2)
+			}
+			epsilon = sampleCount / sigma
+
+			for j := 0; j < innerBucketCount; j++ {
+				value := prevBucket + delta*float64(j)
+				count := epsilon * math.Pow(float64(j-innerBucketCount), 2)
+				values = append(values, value)
+				counts = append(counts, count)
+			}
+		} else if magnitude < 1 {
+			innerCount := sampleCount / float64(innerBucketCount)
+			for j := 1; j <= innerBucketCount; j++ {
+				value := prevBucket + delta*float64(j)
+				values = append(values, value)
+				counts = append(counts, innerCount)
+			}
+		} else {
+			sigma := 0.0
+			for j := 1; j <= innerBucketCount; j++ {
+				sigma += float64(j * j)
+			}
+			epsilon := sampleCount / sigma
+
+			for j := 0; j < innerBucketCount; j++ {
+				value := prevBucket + delta*float64(j)
+				count := epsilon * math.Pow(float64(j), 2)
+				values = append(values, value)
+				counts = append(counts, count)
+			}
+		}
+	}
+
+	return values, counts
 }
 
 func (dps exponentialHistogramDataPointSlice) IsStaleNaNInf(i int) (bool, pcommon.Map) {
